@@ -357,6 +357,7 @@ markers = [
   "solidity: language server running for Solidity (uses @nomicfoundation/solidity-language-server)",
   "ansible: language server running for Ansible (uses @ansible/ansible-language-server)",
   "msl: language server running for mSL (mIRC Scripting Language)",
+  "e2e: end-to-end test against real LSP processes; opt-in via O2_SCALPEL_RUN_E2E=1 or pytest -m e2e",
 ]
 
 [tool.codespell]
