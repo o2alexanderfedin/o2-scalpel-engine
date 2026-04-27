@@ -217,8 +217,11 @@ class TestSerenaAgent:
         ],
         indirect=["serena_agent"],
     )
-    @pytest.mark.xfail(reason="F# language server is unreliable")  # See issue #1040
     def test_find_symbol_fsharp(self, serena_agent: SerenaAgent, symbol_name: str, expected_kind: str, expected_file: str) -> None:
+        # Promoted in stage-v0.2.0-review-i6: this test was @pytest.mark.xfail
+        # for upstream issue #1040 ("F# language server is unreliable") but
+        # has been XPASSing on recent local runs. Promote so future regressions
+        # surface as failures instead of being absorbed by xfail.
         self._assert_find_symbol(serena_agent, symbol_name, expected_kind, expected_file)
 
     @pytest.mark.parametrize(
@@ -228,8 +231,11 @@ class TestSerenaAgent:
         ],
         indirect=["serena_agent"],
     )
-    @pytest.mark.xfail(reason="Rust language server is unreliable")  # See issue #1040
     def test_find_symbol_rust(self, serena_agent: SerenaAgent, symbol_name: str, expected_kind: str, expected_file: str) -> None:
+        # Promoted in stage-v0.2.0-review-i6: this test was @pytest.mark.xfail
+        # for upstream issue #1040 ("Rust language server is unreliable") but
+        # has been XPASSing on recent local runs. Promote so future regressions
+        # surface as failures instead of being absorbed by xfail.
         self._assert_find_symbol(serena_agent, symbol_name, expected_kind, expected_file)
 
     def _assert_find_symbol_references(self, serena_agent: SerenaAgent, symbol_name: str, def_file: str, ref_file: str) -> None:
