@@ -282,7 +282,11 @@ class Language(str, Enum):
             case self.REGO:
                 return FilenameMatcher("*.rego")
             case self.MARKDOWN:
-                return FilenameMatcher("*.md", "*.markdown")
+                # ``*.mdx`` added v1.1.1 Leaf 01 — MDX (Markdown + JSX) files
+                # are first-class for marksman: they parse as markdown for
+                # heading + wiki-link extraction, and the JSX subset is
+                # ignored gracefully.
+                return FilenameMatcher("*.md", "*.markdown", "*.mdx")
             case self.SCALA:
                 return FilenameMatcher("*.scala", "*.sbt")
             case self.JULIA:
