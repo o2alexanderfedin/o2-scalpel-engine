@@ -319,6 +319,8 @@ class TestCSharpSolutionProjectOpening:
 
                     # Verify that logger was called with solution file discovery
                     expected_log_msg = f"Found solution/project file: {solution_file}"
+                    assert mem_log is not None
+
                     assert expected_log_msg in mem_log.get_log()
 
     @patch("solidlsp.language_servers.csharp_language_server.CSharpLanguageServer.DependencyProvider._ensure_server_installed")
@@ -348,6 +350,8 @@ class TestCSharpSolutionProjectOpening:
 
                     # Verify that logger was called with warning about no solution/project files
                     expected_log_msg = "No .sln/.slnx or .csproj file found, language server will attempt auto-discovery"
+                    assert mem_log is not None
+
                     assert expected_log_msg in mem_log.get_log()
 
     def test_solution_and_project_opening_with_real_test_repo(self):
