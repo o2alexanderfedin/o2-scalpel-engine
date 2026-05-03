@@ -604,8 +604,8 @@ def inverse_apply_checkpoint(
 ) -> tuple[bool, list[str]]:
     """Fetch a checkpoint from the store and run :func:`_inverse_applier_to_disk`.
 
-    Convenience wrapper used by ``ScalpelRollbackTool.apply`` and
-    ``ScalpelTransactionRollbackTool.apply``. Returns ``(False, [])`` for
+    Convenience wrapper used by ``RollbackTool.apply`` and
+    ``TransactionRollbackTool.apply``. Returns ``(False, [])`` for
     unknown checkpoint ids so the rollback tool can short-circuit to its
     pre-existing ``no_op`` branch without distinguishing "missing" from
     "empty edit".
@@ -644,23 +644,26 @@ def apply_workspace_edit_and_checkpoint(
 
 
 FACADE_TO_CAPABILITY_ID: dict[str, dict[str, str]] = {
-    "scalpel_split_file": {
+    # v2.0 wire-name cleanup (spec 2026-05-03 § 5.1): keys use canonical
+    # facade names without the legacy ``scalpel_`` prefix. Callers passing
+    # legacy names should resolve via ``ToolRegistry.get_canonical_name_for``.
+    "split_file": {
         "rust": "rust.refactor.move.module",
         "python": "python.refactor.move.module",
     },
-    "scalpel_extract": {
+    "extract": {
         "rust": "rust.refactor.extract.function",
         "python": "python.refactor.extract.function",
     },
-    "scalpel_inline": {
+    "inline": {
         "rust": "rust.refactor.inline.function",
         "python": "python.refactor.inline.function",
     },
-    "scalpel_rename": {
+    "rename": {
         "rust": "rust.refactor.rename",
         "python": "python.refactor.rename",
     },
-    "scalpel_imports_organize": {
+    "imports_organize": {
         "rust": "rust.source.organizeImports",
         "python": "python.source.organizeImports",
     },
@@ -736,12 +739,20 @@ def resolve_capability_for_facade(
     language: str,
     capability_id_override: str | None = None,
 ) -> CapabilityRecord | None:
-    """Look up the CapabilityRecord this facade dispatches to."""
+    """Look up the CapabilityRecord this facade dispatches to.
+
+    v2.0: accepts either a canonical facade name (``extract``) or a
+    legacy alias (``scalpel_extract``); the alias is normalised before
+    lookup to keep older callers working through the deprecation window.
+    """
     catalog = ScalpelRuntime.instance().catalog()
     if capability_id_override is not None:
         target_id = capability_id_override
     else:
-        target_id = FACADE_TO_CAPABILITY_ID.get(facade_name, {}).get(language)
+        # v2.0: strip the legacy ``scalpel_`` prefix so back-compat callers
+        # still resolve to the same record.
+        normalised = facade_name[len("scalpel_"):] if facade_name.startswith("scalpel_") else facade_name
+        target_id = FACADE_TO_CAPABILITY_ID.get(normalised, {}).get(language)
         if target_id is None:
             return None
     for rec in catalog.records:
@@ -777,8 +788,8 @@ def coordinator_for_facade(
     """Acquire the MultiServerCoordinator for ``language`` rooted at ``project_root``.
 
     Supported languages: any value of ``solidlsp.ls_config.Language``. v1.5
-    Phase 2 added ``"java"`` so ``ScalpelExtractTool`` and the new
-    ``ScalpelGenerateConstructorTool`` / ``ScalpelOverrideMethodsTool`` can
+    Phase 2 added ``"java"`` so ``ExtractTool`` and the new
+    ``GenerateConstructorTool`` / ``OverrideMethodsTool`` can
     route through jdtls.
     """
     from solidlsp.ls_config import Language
