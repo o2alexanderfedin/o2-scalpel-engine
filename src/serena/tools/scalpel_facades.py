@@ -79,7 +79,7 @@ def _infer_extract_language(file: str, explicit: str | None) -> str:
 
     Kept as a separate helper so the broader Rust/Python facade fleet that
     does not accept ``language="java"`` is not silently widened — only
-    ``ScalpelExtractTool`` (and the new Java-specific facades) call this.
+    ``ExtractTool`` (and the new Java-specific facades) call this.
     """
     if explicit is not None:
         return explicit
@@ -285,11 +285,11 @@ def _run_async(coro):
 
 
 # ---------------------------------------------------------------------------
-# T3: ScalpelSplitFileTool
+# T3: SplitFileTool
 # ---------------------------------------------------------------------------
 
 
-class ScalpelSplitFileTool(Tool):
+class SplitFileTool(Tool):
     """PREFERRED: split a source file into N modules by moving named symbols.
 
     Note: groups symbol-grouping is informational in v1.6 — rust-analyzer's
@@ -352,7 +352,7 @@ class ScalpelSplitFileTool(Tool):
         if lang not in ("rust", "python"):
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_split_file",
+                stage="split_file",
                 reason=f"Cannot infer language from {file!r}; pass language=.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -564,7 +564,7 @@ class ScalpelSplitFileTool(Tool):
                         continue
                     return build_failure_result(
                         code=ErrorCode.SYMBOL_NOT_FOUND,
-                        stage="scalpel_split_file",
+                        stage="split_file",
                         reason=f"Symbol {symbol!r} not found in {file!r}.",
                     )
                 actions = _run_async(coord.merge_code_actions(
@@ -584,7 +584,7 @@ class ScalpelSplitFileTool(Tool):
                         continue
                     return build_failure_result(
                         code=ErrorCode.SYMBOL_NOT_FOUND,
-                        stage="scalpel_split_file",
+                        stage="split_file",
                         reason=(
                             f"No refactor.extract.module action for {symbol!r} "
                             f"in {file!r}."
@@ -642,7 +642,7 @@ class ScalpelSplitFileTool(Tool):
 
 
 # ---------------------------------------------------------------------------
-# T4: ScalpelExtractTool
+# T4: ExtractTool
 # ---------------------------------------------------------------------------
 
 
@@ -820,7 +820,7 @@ def _substitute_introduced_parameter_name(
     return out
 
 
-# v1.5 P2 — per-language target-validity matrix for ``ScalpelExtractTool``.
+# v1.5 P2 — per-language target-validity matrix for ``ExtractTool``.
 # Spec § 4.2.1 (rust/python/java × variable/function/constant/static/type_alias/module).
 # Combinations not listed in the language's set return CAPABILITY_NOT_AVAILABLE
 # (the existing dynamic-capability registry envelope) BEFORE any LSP call.
@@ -837,7 +837,7 @@ _EXTRACT_VALID_TARGETS_BY_LANGUAGE: dict[str, frozenset[str]] = {
 }
 
 
-class ScalpelExtractTool(Tool):
+class ExtractTool(Tool):
     """PREFERRED: extract a symbol/selection into a new variable/function/module/type.
 
     Note: new_name, visibility, similar, and global_scope are informational;
@@ -903,7 +903,7 @@ class ScalpelExtractTool(Tool):
         if range is None and name_path is None:
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_extract",
+                stage="extract",
                 reason="One of range= or name_path= is required.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -911,7 +911,7 @@ class ScalpelExtractTool(Tool):
         if kind is None:
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_extract",
+                stage="extract",
                 reason=f"Unknown target {target!r}; expected one of {sorted(_EXTRACT_TARGET_TO_KIND)}.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -919,7 +919,7 @@ class ScalpelExtractTool(Tool):
         if lang not in ("rust", "python", "java"):
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_extract",
+                stage="extract",
                 reason=f"Cannot infer language from {file!r}; pass language=.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -946,7 +946,7 @@ class ScalpelExtractTool(Tool):
             if range is None:
                 return build_failure_result(
                     code=ErrorCode.SYMBOL_NOT_FOUND,
-                    stage="scalpel_extract",
+                    stage="extract",
                     reason=f"Symbol {name_path!r} not found in {file!r}.",
                     recoverable=False,
                 ).model_dump_json(indent=2)
@@ -976,7 +976,7 @@ class ScalpelExtractTool(Tool):
         if not actions:
             return build_failure_result(
                 code=ErrorCode.SYMBOL_NOT_FOUND,
-                stage="scalpel_extract",
+                stage="extract",
                 reason=f"No {kind} actions surfaced for {file!r}.",
             ).model_dump_json(indent=2)
         if dry_run:
@@ -1027,7 +1027,7 @@ class ScalpelExtractTool(Tool):
 
 
 # ---------------------------------------------------------------------------
-# T5: ScalpelInlineTool
+# T5: InlineTool
 # ---------------------------------------------------------------------------
 
 
@@ -1095,7 +1095,7 @@ def _filter_definition_deletion_hunks(
     return out
 
 
-class ScalpelInlineTool(Tool):
+class InlineTool(Tool):
     """PREFERRED: inline a function/variable/type alias at definition or call sites.
 
     Note: name_path and remove_definition are informational; rust-analyzer
@@ -1156,7 +1156,7 @@ class ScalpelInlineTool(Tool):
         if kind is None:
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_inline",
+                stage="inline",
                 reason=f"Unknown target {target!r}; expected one of {sorted(_INLINE_TARGET_TO_KIND)}.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -1169,7 +1169,7 @@ class ScalpelInlineTool(Tool):
         ):
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_inline",
+                stage="inline",
                 reason=(
                     "scope=single_call_site requires position= or name_path=."
                 ),
@@ -1178,7 +1178,7 @@ class ScalpelInlineTool(Tool):
         if scope == "all_callers" and name_path is None and position is None:
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_inline",
+                stage="inline",
                 reason=(
                     "scope=all_callers requires name_path= or position= so "
                     "references can be located."
@@ -1189,7 +1189,7 @@ class ScalpelInlineTool(Tool):
         if lang not in ("rust", "python"):
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_inline",
+                stage="inline",
                 reason=f"Cannot infer language from {file!r}; pass language=.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -1207,7 +1207,7 @@ class ScalpelInlineTool(Tool):
             if resolved is None:
                 return build_failure_result(
                     code=ErrorCode.SYMBOL_NOT_FOUND,
-                    stage="scalpel_inline",
+                    stage="inline",
                     reason=f"Symbol {name_path!r} not found in {file!r}.",
                     recoverable=False,
                 ).model_dump_json(indent=2)
@@ -1231,7 +1231,7 @@ class ScalpelInlineTool(Tool):
             if not dispatch_positions:
                 return build_failure_result(
                     code=ErrorCode.SYMBOL_NOT_FOUND,
-                    stage="scalpel_inline",
+                    stage="inline",
                     reason=(
                         f"No call-sites found for {name_path!r} in workspace."
                     ),
@@ -1256,7 +1256,7 @@ class ScalpelInlineTool(Tool):
         if not all_actions:
             return build_failure_result(
                 code=ErrorCode.SYMBOL_NOT_FOUND,
-                stage="scalpel_inline",
+                stage="inline",
                 reason=f"No {kind} actions surfaced for {file!r}.",
             ).model_dump_json(indent=2)
         if dry_run:
@@ -1296,7 +1296,7 @@ class ScalpelInlineTool(Tool):
 
 
 # ---------------------------------------------------------------------------
-# T6: ScalpelRenameTool
+# T6: RenameTool
 # ---------------------------------------------------------------------------
 
 
@@ -1308,7 +1308,7 @@ def _looks_like_module_name_path(name_path: str, file: str) -> bool:
     return name_path == base
 
 
-class ScalpelRenameTool(Tool):
+class RenameTool(Tool):
     """PREFERRED: rename a symbol everywhere it is referenced. Cross-file via LSP textDocument/rename with checkpoint+rollback.
 
     Note: also_in_strings is informational in v1.6 — naive regex
@@ -1357,7 +1357,7 @@ class ScalpelRenameTool(Tool):
         if lang not in ("rust", "python"):
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_rename",
+                stage="rename",
                 reason=f"Cannot infer language from {file!r}; pass language=.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -1375,7 +1375,7 @@ class ScalpelRenameTool(Tool):
         if position is None:
             return build_failure_result(
                 code=ErrorCode.SYMBOL_NOT_FOUND,
-                stage="scalpel_rename",
+                stage="rename",
                 reason=f"Symbol {name_path!r} not found in {file!r}.",
             ).model_dump_json(indent=2)
         # Gate: skip when the responsible server does not advertise
@@ -1439,12 +1439,12 @@ class ScalpelRenameTool(Tool):
             ).model_dump_json(indent=2)
         # v1.5 post-G7-C — Rule-1 fix: route the WorkspaceEdit through the
         # disk applier before recording the checkpoint. Prior to this
-        # call, ScalpelRenameTool.apply reported ``applied=True`` and
+        # call, RenameTool.apply reported ``applied=True`` and
         # captured the edit in a checkpoint but never mutated the
         # filesystem (decorative facade — same class of bug the v1.5
         # milestone targets). See deferred-items.md "Wave 4 discovery"
         # for the regression history. Mirrors the pattern in
-        # ScalpelExtractTool / ScalpelInlineTool / ScalpelSplitFileTool.
+        # ExtractTool / InlineTool / SplitFileTool.
         wedit = merged_dict.get("workspace_edit", {}) or {}
         if wedit:
             _apply_workspace_edit_to_disk(wedit)
@@ -1587,7 +1587,7 @@ def _augment_workspace_edit_with_all_update(
 
 
 # ---------------------------------------------------------------------------
-# T7: ScalpelImportsOrganizeTool
+# T7: ImportsOrganizeTool
 # ---------------------------------------------------------------------------
 
 
@@ -1598,7 +1598,7 @@ _ENGINE_TO_PROVENANCE: dict[str, str] = {
 }
 
 
-class ScalpelImportsOrganizeTool(Tool):
+class ImportsOrganizeTool(Tool):
     """PREFERRED: add missing, remove unused, reorder imports across files.
 
     Note: add_missing, remove_unused, and reorder are informational;
@@ -1673,7 +1673,7 @@ class ScalpelImportsOrganizeTool(Tool):
         if lang not in ("rust", "python"):
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_imports_organize",
+                stage="imports_organize",
                 reason=f"Cannot infer language from {files[0]!r}; pass language=.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -1804,7 +1804,7 @@ class ScalpelImportsOrganizeTool(Tool):
 
 
 # ---------------------------------------------------------------------------
-# T8: ScalpelTransactionCommitTool — 13th always-on tool
+# T8: TransactionCommitTool — 13th always-on tool
 # ---------------------------------------------------------------------------
 
 
@@ -2024,7 +2024,7 @@ _MODULE_LAYOUT_TO_KIND: dict[str, str] = {
 }
 
 
-class ScalpelConvertModuleLayoutTool(Tool):
+class ConvertModuleLayoutTool(Tool):
     """PREFERRED: convert a Rust ``mod foo;`` into ``mod foo {{ ... }}`` (or vice versa)."""
 
     def apply(
@@ -2054,7 +2054,7 @@ class ScalpelConvertModuleLayoutTool(Tool):
         if kind is None:
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_convert_module_layout",
+                stage="convert_module_layout",
                 reason=f"Unknown target_layout {target_layout!r}; expected 'file' or 'inline'.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -2089,7 +2089,7 @@ _VISIBILITY_TITLE_MATCH: dict[str, str] = {
 }
 
 
-class ScalpelChangeVisibilityTool(Tool):
+class ChangeVisibilityTool(Tool):
     """PREFERRED: toggle a Rust item's visibility (pub / pub(crate) / pub(super) / private).
 
     Note: target_visibility is informational; rust-analyzer picks the
@@ -2161,7 +2161,7 @@ _TIDY_STRUCTURE_SCOPE_TO_KINDS: dict[str, tuple[str, ...]] = {
 }
 
 
-class ScalpelTidyStructureTool(Tool):
+class TidyStructureTool(Tool):
     """PREFERRED: reorder impl items, sort items, and reorder struct fields in a file.
 
     Note: scope is informational beyond a post-merge kind-restrict;
@@ -2208,7 +2208,7 @@ class ScalpelTidyStructureTool(Tool):
         if lang not in ("rust", "python"):
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_tidy_structure",
+                stage="tidy_structure",
                 reason=f"Cannot infer language from {file!r}; pass language=.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -2237,7 +2237,7 @@ class ScalpelTidyStructureTool(Tool):
             if position is None:
                 return build_failure_result(
                     code=ErrorCode.INVALID_ARGUMENT,
-                    stage="scalpel_tidy_structure",
+                    stage="tidy_structure",
                     reason=(
                         f"scope={scope!r} requires a `position` "
                         f"identifying the target type/impl; pass "
@@ -2325,7 +2325,7 @@ _TYPE_SHAPE_TO_KIND: dict[str, str] = {
 }
 
 
-class ScalpelChangeTypeShapeTool(Tool):
+class ChangeTypeShapeTool(Tool):
     """PREFERRED: apply a Rust ``convert_*_to_*`` rewrite at a cursor."""
 
     def apply(
@@ -2356,7 +2356,7 @@ class ScalpelChangeTypeShapeTool(Tool):
         if kind is None:
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_change_type_shape",
+                stage="change_type_shape",
                 reason=f"Unknown target_shape {target_shape!r}; expected one of {sorted(_TYPE_SHAPE_TO_KIND)}.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -2383,7 +2383,7 @@ class ScalpelChangeTypeShapeTool(Tool):
 _RETURN_TYPE_KIND = "refactor.rewrite.change_return_type"
 
 
-class ScalpelChangeReturnTypeTool(Tool):
+class ChangeReturnTypeTool(Tool):
     """PREFERRED: rewrite a Rust function's return type at a cursor.
 
     Note: new_return_type is informational; rust-analyzer picks the
@@ -2438,7 +2438,7 @@ class ScalpelChangeReturnTypeTool(Tool):
 _MATCH_ARMS_KIND = "quickfix.add_missing_match_arms"
 
 
-class ScalpelCompleteMatchArmsTool(Tool):
+class CompleteMatchArmsTool(Tool):
     """PREFERRED: insert the missing arms of a Rust ``match`` over a sealed enum."""
 
     def apply(
@@ -2479,7 +2479,7 @@ class ScalpelCompleteMatchArmsTool(Tool):
 _LIFETIME_KIND = "refactor.extract.extract_lifetime"
 
 
-class ScalpelExtractLifetimeTool(Tool):
+class ExtractLifetimeTool(Tool):
     """PREFERRED: extract a fresh lifetime parameter for a Rust reference at a cursor.
 
     Note: lifetime_name is informational; rust-analyzer picks the
@@ -2534,7 +2534,7 @@ class ScalpelExtractLifetimeTool(Tool):
 _GLOB_IMPORTS_KIND = "refactor.rewrite.expand_glob_imports"
 
 
-class ScalpelExpandGlobImportsTool(Tool):
+class ExpandGlobImportsTool(Tool):
     """PREFERRED: expand ``use foo::*;`` into the explicit names it brings into scope."""
 
     def apply(
@@ -2580,7 +2580,7 @@ class ScalpelExpandGlobImportsTool(Tool):
 _GENERATE_TRAIT_IMPL_KIND = "refactor.rewrite.generate_trait_impl"
 
 
-class ScalpelGenerateTraitImplScaffoldTool(Tool):
+class GenerateTraitImplScaffoldTool(Tool):
     """PREFERRED: generate an ``impl Trait for Type {}`` scaffold at a cursor.
 
     Note: trait_name is informational; rust-analyzer picks the action
@@ -2639,7 +2639,7 @@ _MEMBER_KIND_TO_KIND: dict[str, str] = {
 }
 
 
-class ScalpelGenerateMemberTool(Tool):
+class GenerateMemberTool(Tool):
     """PREFERRED: generate a getter / setter / method stub for a Rust struct field."""
 
     def apply(
@@ -2668,7 +2668,7 @@ class ScalpelGenerateMemberTool(Tool):
         if kind is None:
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_generate_member",
+                stage="generate_member",
                 reason=f"Unknown member_kind {member_kind!r}; expected one of {sorted(_MEMBER_KIND_TO_KIND)}.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -2687,7 +2687,7 @@ class ScalpelGenerateMemberTool(Tool):
         )
 
 
-class ScalpelExpandMacroTool(Tool):
+class ExpandMacroTool(Tool):
     """PREFERRED: expand a Rust macro at a cursor and return the expanded source.
 
     Honors dry_run: when True, the rust-analyzer expandMacro probe is
@@ -2729,7 +2729,7 @@ class ScalpelExpandMacroTool(Tool):
         if lang != "rust":
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_expand_macro",
+                stage="expand_macro",
                 reason="expand_macro is rust-analyzer-only.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -2770,7 +2770,7 @@ class ScalpelExpandMacroTool(Tool):
         ).model_dump_json(indent=2)
 
 
-class ScalpelVerifyAfterRefactorTool(Tool):
+class VerifyAfterRefactorTool(Tool):
     """PREFERRED: composite verification — runnables + relatedTests + flycheck.
 
     Honors dry_run: when True, both the runnables probe and the
@@ -2811,7 +2811,7 @@ class ScalpelVerifyAfterRefactorTool(Tool):
         if lang != "rust":
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_verify_after_refactor",
+                stage="verify_after_refactor",
                 reason="verify_after_refactor is rust-analyzer-only.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -2981,7 +2981,7 @@ def _python_dispatch_single_kind(
 _METHOD_OBJECT_KIND = "refactor.rewrite.method_to_method_object"
 
 
-class ScalpelConvertToMethodObjectTool(Tool):
+class ConvertToMethodObjectTool(Tool):
     """PREFERRED: convert a method body into its own callable object (Rope)."""
 
     def apply(
@@ -3021,7 +3021,7 @@ class ScalpelConvertToMethodObjectTool(Tool):
 _LOCAL_TO_FIELD_KIND = "refactor.rewrite.local_to_field"
 
 
-class ScalpelLocalToFieldTool(Tool):
+class LocalToFieldTool(Tool):
     """PREFERRED: promote a local variable to an instance field (Rope refactor)."""
 
     def apply(
@@ -3061,7 +3061,7 @@ class ScalpelLocalToFieldTool(Tool):
 _USE_FUNCTION_KIND = "refactor.rewrite.use_function"
 
 
-class ScalpelUseFunctionTool(Tool):
+class UseFunctionTool(Tool):
     """PREFERRED: replace inline expressions with calls to an existing function (Rope)."""
 
     def apply(
@@ -3101,7 +3101,7 @@ class ScalpelUseFunctionTool(Tool):
 _INTRODUCE_PARAMETER_KIND = "refactor.rewrite.introduce_parameter"
 
 
-class ScalpelIntroduceParameterTool(Tool):
+class IntroduceParameterTool(Tool):
     """PREFERRED: lift a local expression into a function parameter (Rope refactor).
 
     Note: parameter_name is informational; pylsp-rope picks the action
@@ -3162,7 +3162,7 @@ class ScalpelIntroduceParameterTool(Tool):
 
 _GENERATE_FROM_UNDEFINED_KIND = "quickfix.generate"
 
-# v1.5 G4-5 — per-target-kind LSP filter for ScalpelGenerateFromUndefinedTool.
+# v1.5 G4-5 — per-target-kind LSP filter for GenerateFromUndefinedTool.
 # Modern rope advertises granular ``quickfix.generate.<kind>`` kinds; the
 # facade dispatches the granular kind when supported. Older rope versions
 # only advertise the flat ``quickfix.generate`` — the facade falls back to
@@ -3175,7 +3175,7 @@ _GENERATE_FROM_UNDEFINED_KIND_BY_TARGET: dict[str, str] = {
 }
 
 
-class ScalpelGenerateFromUndefinedTool(Tool):
+class GenerateFromUndefinedTool(Tool):
     """PREFERRED: generate a function/class/variable stub from an undefined name (Rope).
 
     Note: target_kind is informational beyond a post-merge title-prefix
@@ -3255,7 +3255,7 @@ class ScalpelGenerateFromUndefinedTool(Tool):
 _AUTO_IMPORT_KIND = "quickfix.import"
 
 
-class ScalpelAutoImportSpecializedTool(Tool):
+class AutoImportSpecializedTool(Tool):
     """PREFERRED: resolve an undefined name to an explicit ``import`` statement.
 
     Note: symbol_name is informational; pylsp-rope picks the action
@@ -3312,7 +3312,7 @@ class ScalpelAutoImportSpecializedTool(Tool):
 _FIX_LINTS_KIND = "source.fixAll.ruff"
 
 
-class ScalpelFixLintsTool(Tool):
+class FixLintsTool(Tool):
     """PREFERRED: apply ruff's full set of auto-fixable lints (incl. duplicate-import dedup)."""
 
     routing_aliases: ClassVar[tuple[str, ...]] = ("fix", "lint", "fixall", "source", "available")
@@ -3453,7 +3453,7 @@ _IGNORE_DIAGNOSTIC_KIND_BY_TOOL: dict[str, str] = {
 }
 
 
-class ScalpelIgnoreDiagnosticTool(Tool):
+class IgnoreDiagnosticTool(Tool):
     """PREFERRED: insert an inline ignore-comment for a basedpyright or ruff rule.
 
     Note: rule is informational beyond a post-merge action-filter;
@@ -3501,7 +3501,7 @@ class ScalpelIgnoreDiagnosticTool(Tool):
         if kind is None:
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_ignore_diagnostic",
+                stage="ignore_diagnostic",
                 reason=f"Unknown tool_name {tool_name!r}; expected 'pyright' or 'ruff'.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -3556,7 +3556,7 @@ class ScalpelIgnoreDiagnosticTool(Tool):
 # ---------------------------------------------------------------------------
 
 
-class ScalpelConvertToAsyncTool(Tool):
+class ConvertToAsyncTool(Tool):
     """PREFERRED: convert a sync `def` into `async def` and propagate `await` calls."""
 
     def apply(
@@ -3597,14 +3597,14 @@ class ScalpelConvertToAsyncTool(Tool):
         except FileNotFoundError as exc:
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_convert_to_async",
+                stage="convert_to_async",
                 reason=str(exc),
                 recoverable=False,
             ).model_dump_json(indent=2)
         except ValueError as exc:
             return build_failure_result(
                 code=ErrorCode.SYMBOL_NOT_FOUND,
-                stage="scalpel_convert_to_async",
+                stage="convert_to_async",
                 reason=str(exc),
             ).model_dump_json(indent=2)
         elapsed_ms = int((time.monotonic() - t0) * 1000)
@@ -3635,7 +3635,7 @@ class ScalpelConvertToAsyncTool(Tool):
         ).model_dump_json(indent=2)
 
 
-class ScalpelAnnotateReturnTypeTool(Tool):
+class AnnotateReturnTypeTool(Tool):
     """PREFERRED: insert `-> <Type>` on a function using basedpyright inlay-hint inference."""
 
     def apply(
@@ -3680,7 +3680,7 @@ class ScalpelAnnotateReturnTypeTool(Tool):
         except FileNotFoundError as exc:
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_annotate_return_type",
+                stage="annotate_return_type",
                 reason=str(exc),
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -3701,7 +3701,7 @@ class ScalpelAnnotateReturnTypeTool(Tool):
         if status.get("status") != "applied" or workspace_edit is None:
             return build_failure_result(
                 code=ErrorCode.SYMBOL_NOT_FOUND,
-                stage="scalpel_annotate_return_type",
+                stage="annotate_return_type",
                 reason=str(status),
             ).model_dump_json(indent=2)
         if dry_run:
@@ -3752,7 +3752,7 @@ def _get_inlay_hint_provider(project_root: Path):
     return fetcher
 
 
-class ScalpelConvertFromRelativeImportsTool(Tool):
+class ConvertFromRelativeImportsTool(Tool):
     """PREFERRED: convert every relative import in a module to its absolute form (rope)."""
 
     def apply(
@@ -3791,7 +3791,7 @@ class ScalpelConvertFromRelativeImportsTool(Tool):
         except FileNotFoundError as exc:
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_convert_from_relative_imports",
+                stage="convert_from_relative_imports",
                 reason=str(exc),
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -3812,7 +3812,7 @@ class ScalpelConvertFromRelativeImportsTool(Tool):
         if status.get("status") != "applied" or workspace_edit is None:
             return build_failure_result(
                 code=ErrorCode.INTERNAL_ERROR,
-                stage="scalpel_convert_from_relative_imports",
+                stage="convert_from_relative_imports",
                 reason=str(status),
             ).model_dump_json(indent=2)
         if dry_run:
@@ -3865,7 +3865,7 @@ def _find_heading_position(file_path: Path, heading_text: str) -> dict[str, int]
     and the space). ``None`` when ``heading_text`` does not match any
     ATX-style heading in the file.
 
-    Used by ``ScalpelRenameHeadingTool`` so callers can pass the
+    Used by ``RenameHeadingTool`` so callers can pass the
     heading text directly (more ergonomic than name_path + position
     coordinates for markdown).
     """
@@ -3886,7 +3886,7 @@ def _find_heading_position(file_path: Path, heading_text: str) -> dict[str, int]
     return None
 
 
-class ScalpelRenameHeadingTool(Tool):
+class RenameHeadingTool(Tool):
     """PREFERRED: rename a markdown heading and propagate to all wiki-links."""
 
     def apply(
@@ -3926,7 +3926,7 @@ class ScalpelRenameHeadingTool(Tool):
         if position is None:
             return build_failure_result(
                 code=ErrorCode.SYMBOL_NOT_FOUND,
-                stage="scalpel_rename_heading",
+                stage="rename_heading",
                 reason=f"Heading {heading!r} not found in {file!r}.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -3954,7 +3954,7 @@ class ScalpelRenameHeadingTool(Tool):
         if workspace_edit is None:
             return build_failure_result(
                 code=ErrorCode.SYMBOL_NOT_FOUND,
-                stage="scalpel_rename_heading",
+                stage="rename_heading",
                 reason=(
                     f"marksman returned no rename edit for heading {heading!r} "
                     f"in {file!r}."
@@ -3986,7 +3986,7 @@ class ScalpelRenameHeadingTool(Tool):
         ).model_dump_json(indent=2)
 
 
-class ScalpelSplitDocTool(Tool):
+class SplitDocTool(Tool):
     """PREFERRED: split a long markdown doc along H1/H2 boundaries into linked sub-docs."""
 
     def apply(
@@ -4049,7 +4049,7 @@ class ScalpelSplitDocTool(Tool):
         ).model_dump_json(indent=2)
 
 
-class ScalpelExtractSectionTool(Tool):
+class ExtractSectionTool(Tool):
     """PREFERRED: extract one markdown section into a new file with a back-link."""
 
     def apply(
@@ -4093,7 +4093,7 @@ class ScalpelExtractSectionTool(Tool):
         except KeyError:
             return build_failure_result(
                 code=ErrorCode.SYMBOL_NOT_FOUND,
-                stage="scalpel_extract_section",
+                stage="extract_section",
                 reason=f"Heading {heading!r} not found in {file!r}.",
                 recoverable=False,
             ).model_dump_json(indent=2)
@@ -4121,7 +4121,7 @@ class ScalpelExtractSectionTool(Tool):
         ).model_dump_json(indent=2)
 
 
-class ScalpelOrganizeLinksTool(Tool):
+class OrganizeLinksTool(Tool):
     """PREFERRED: sort + dedup the links in a markdown file."""
 
     def apply(
@@ -4187,7 +4187,7 @@ class ScalpelOrganizeLinksTool(Tool):
 # ---------------------------------------------------------------------------
 #
 # Spec: docs/superpowers/specs/2026-04-29-lsp-feature-coverage-spec.md § 4.2.
-# These two facades plus the Java arm on ``ScalpelExtractTool`` constitute
+# These two facades plus the Java arm on ``ExtractTool`` constitute
 # the v1.5 Phase 2 deliverable. The e2e fixture at ``playground/java/`` is
 # deferred to Phase 2.5; unit tests with mocked jdtls coordinator ship now
 # (per spec § 4.4 fallback path).
@@ -4290,7 +4290,7 @@ def _java_generate_dispatch(
     ).model_dump_json(indent=2)
 
 
-class ScalpelGenerateConstructorTool(Tool):
+class GenerateConstructorTool(Tool):
     """PREFERRED: Java constructor generation. Generates a constructor for
     a Java class via jdtls source.generate.constructor.
 
@@ -4353,7 +4353,7 @@ class ScalpelGenerateConstructorTool(Tool):
         if lang != "java":
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_generate_constructor",
+                stage="generate_constructor",
                 reason=(
                     f"scalpel_generate_constructor is jdtls-only; "
                     f"got language={lang!r} for {file!r}."
@@ -4370,7 +4370,7 @@ class ScalpelGenerateConstructorTool(Tool):
         )
 
 
-class ScalpelOverrideMethodsTool(Tool):
+class OverrideMethodsTool(Tool):
     """PREFERRED: add @Override stubs in Java classes via jdtls
     source.generate.overrideMethods.
 
@@ -4414,7 +4414,7 @@ class ScalpelOverrideMethodsTool(Tool):
             when jdtls is missing or fails to advertise the kind).
         """
         # v1.5 G6 ME-4 — see the matching block on
-        # ScalpelGenerateConstructorTool.apply for the rationale.
+        # GenerateConstructorTool.apply for the rationale.
         if method_names:
             return json.dumps({
                 "status": "skipped",
@@ -4431,7 +4431,7 @@ class ScalpelOverrideMethodsTool(Tool):
         if lang != "java":
             return build_failure_result(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_override_methods",
+                stage="override_methods",
                 reason=(
                     f"scalpel_override_methods is jdtls-only; "
                     f"got language={lang!r} for {file!r}."
@@ -4500,51 +4500,51 @@ def _bind_facade_dispatch_table() -> None:
     backlog item "transaction-commit dispatch passes agent forward".
     """
     none_agent = cast(Any, None)
-    _FACADE_DISPATCH["scalpel_split_file"] = lambda **kw: ScalpelSplitFileTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_extract"] = lambda **kw: ScalpelExtractTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_inline"] = lambda **kw: ScalpelInlineTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_rename"] = lambda **kw: ScalpelRenameTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_imports_organize"] = lambda **kw: ScalpelImportsOrganizeTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_split_file"] = lambda **kw: SplitFileTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_extract"] = lambda **kw: ExtractTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_inline"] = lambda **kw: InlineTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_rename"] = lambda **kw: RenameTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_imports_organize"] = lambda **kw: ImportsOrganizeTool(none_agent).apply(**kw)
     # Stage 3 (v0.2.0) — Rust ergonomic facades wave A
-    _FACADE_DISPATCH["scalpel_convert_module_layout"] = lambda **kw: ScalpelConvertModuleLayoutTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_change_visibility"] = lambda **kw: ScalpelChangeVisibilityTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_tidy_structure"] = lambda **kw: ScalpelTidyStructureTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_change_type_shape"] = lambda **kw: ScalpelChangeTypeShapeTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_convert_module_layout"] = lambda **kw: ConvertModuleLayoutTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_change_visibility"] = lambda **kw: ChangeVisibilityTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_tidy_structure"] = lambda **kw: TidyStructureTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_change_type_shape"] = lambda **kw: ChangeTypeShapeTool(none_agent).apply(**kw)
     # Stage 3 (v0.2.0) — Rust ergonomic facades wave B
-    _FACADE_DISPATCH["scalpel_change_return_type"] = lambda **kw: ScalpelChangeReturnTypeTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_complete_match_arms"] = lambda **kw: ScalpelCompleteMatchArmsTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_extract_lifetime"] = lambda **kw: ScalpelExtractLifetimeTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_expand_glob_imports"] = lambda **kw: ScalpelExpandGlobImportsTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_change_return_type"] = lambda **kw: ChangeReturnTypeTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_complete_match_arms"] = lambda **kw: CompleteMatchArmsTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_extract_lifetime"] = lambda **kw: ExtractLifetimeTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_expand_glob_imports"] = lambda **kw: ExpandGlobImportsTool(none_agent).apply(**kw)
     # Stage 3 (v0.2.0) — Rust ergonomic facades wave C
-    _FACADE_DISPATCH["scalpel_generate_trait_impl_scaffold"] = lambda **kw: ScalpelGenerateTraitImplScaffoldTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_generate_member"] = lambda **kw: ScalpelGenerateMemberTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_expand_macro"] = lambda **kw: ScalpelExpandMacroTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_verify_after_refactor"] = lambda **kw: ScalpelVerifyAfterRefactorTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_generate_trait_impl_scaffold"] = lambda **kw: GenerateTraitImplScaffoldTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_generate_member"] = lambda **kw: GenerateMemberTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_expand_macro"] = lambda **kw: ExpandMacroTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_verify_after_refactor"] = lambda **kw: VerifyAfterRefactorTool(none_agent).apply(**kw)
     # Stage 3 (v0.2.0) — Python ergonomic facades wave A
-    _FACADE_DISPATCH["scalpel_convert_to_method_object"] = lambda **kw: ScalpelConvertToMethodObjectTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_local_to_field"] = lambda **kw: ScalpelLocalToFieldTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_use_function"] = lambda **kw: ScalpelUseFunctionTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_introduce_parameter"] = lambda **kw: ScalpelIntroduceParameterTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_convert_to_method_object"] = lambda **kw: ConvertToMethodObjectTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_local_to_field"] = lambda **kw: LocalToFieldTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_use_function"] = lambda **kw: UseFunctionTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_introduce_parameter"] = lambda **kw: IntroduceParameterTool(none_agent).apply(**kw)
     # Stage 3 (v0.2.0) — Python ergonomic facades wave B
-    _FACADE_DISPATCH["scalpel_generate_from_undefined"] = lambda **kw: ScalpelGenerateFromUndefinedTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_auto_import_specialized"] = lambda **kw: ScalpelAutoImportSpecializedTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_fix_lints"] = lambda **kw: ScalpelFixLintsTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_ignore_diagnostic"] = lambda **kw: ScalpelIgnoreDiagnosticTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_generate_from_undefined"] = lambda **kw: GenerateFromUndefinedTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_auto_import_specialized"] = lambda **kw: AutoImportSpecializedTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_fix_lints"] = lambda **kw: FixLintsTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_ignore_diagnostic"] = lambda **kw: IgnoreDiagnosticTool(none_agent).apply(**kw)
     # v1.1 Stream 5 / Leaf 07 — Python-only ergonomic facades.
-    _FACADE_DISPATCH["scalpel_convert_to_async"] = lambda **kw: ScalpelConvertToAsyncTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_annotate_return_type"] = lambda **kw: ScalpelAnnotateReturnTypeTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_convert_from_relative_imports"] = lambda **kw: ScalpelConvertFromRelativeImportsTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_convert_to_async"] = lambda **kw: ConvertToAsyncTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_annotate_return_type"] = lambda **kw: AnnotateReturnTypeTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_convert_from_relative_imports"] = lambda **kw: ConvertFromRelativeImportsTool(none_agent).apply(**kw)
     # v1.1.1 Leaf 02 — markdown facades (single-LSP marksman).
-    _FACADE_DISPATCH["scalpel_rename_heading"] = lambda **kw: ScalpelRenameHeadingTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_split_doc"] = lambda **kw: ScalpelSplitDocTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_extract_section"] = lambda **kw: ScalpelExtractSectionTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_organize_links"] = lambda **kw: ScalpelOrganizeLinksTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_rename_heading"] = lambda **kw: RenameHeadingTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_split_doc"] = lambda **kw: SplitDocTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_extract_section"] = lambda **kw: ExtractSectionTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_organize_links"] = lambda **kw: OrganizeLinksTool(none_agent).apply(**kw)
     # v1.5 P2 — Java facades (single-LSP jdtls).
-    _FACADE_DISPATCH["scalpel_generate_constructor"] = lambda **kw: ScalpelGenerateConstructorTool(none_agent).apply(**kw)
-    _FACADE_DISPATCH["scalpel_override_methods"] = lambda **kw: ScalpelOverrideMethodsTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_generate_constructor"] = lambda **kw: GenerateConstructorTool(none_agent).apply(**kw)
+    _FACADE_DISPATCH["scalpel_override_methods"] = lambda **kw: OverrideMethodsTool(none_agent).apply(**kw)
 
 
-class ScalpelTransactionCommitTool(Tool):
+class TransactionCommitTool(Tool):
     """PREFERRED: commit a previewed transaction from dry_run_compose."""
 
     def apply(self, transaction_id: str) -> str:
@@ -4563,7 +4563,7 @@ class ScalpelTransactionCommitTool(Tool):
         if not steps:
             failed = _build_failure_step(
                 code=ErrorCode.INVALID_ARGUMENT,
-                stage="scalpel_transaction_commit",
+                stage="transaction_commit",
                 reason=(
                     f"Unknown or empty transaction_id: {transaction_id!r}; "
                     f"call scalpel_dry_run_compose first."
@@ -4579,7 +4579,7 @@ class ScalpelTransactionCommitTool(Tool):
         if expiry > 0.0 and expiry < time.time():
             failed = _build_failure_step(
                 code=ErrorCode.PREVIEW_EXPIRED,
-                stage="scalpel_transaction_commit",
+                stage="transaction_commit",
                 reason=f"Transaction {transaction_id!r} preview expired at {expiry}.",
             )
             return TransactionResult(
@@ -4596,7 +4596,7 @@ class ScalpelTransactionCommitTool(Tool):
             if dispatcher is None:
                 per_step.append(_build_failure_step(
                     code=ErrorCode.CAPABILITY_NOT_AVAILABLE,
-                    stage="scalpel_transaction_commit",
+                    stage="transaction_commit",
                     reason=f"Unknown tool {tool_name!r} in step {idx}.",
                 ))
                 break
@@ -4607,7 +4607,7 @@ class ScalpelTransactionCommitTool(Tool):
             except Exception as exc:  # noqa: BLE001 — surface as failure
                 per_step.append(_build_failure_step(
                     code=ErrorCode.INTERNAL_ERROR,
-                    stage="scalpel_transaction_commit",
+                    stage="transaction_commit",
                     reason=f"step {idx} ({tool_name!r}) raised: {exc!r}",
                 ))
                 break
@@ -4616,7 +4616,7 @@ class ScalpelTransactionCommitTool(Tool):
             except Exception as exc:  # noqa: BLE001
                 per_step.append(_build_failure_step(
                     code=ErrorCode.INTERNAL_ERROR,
-                    stage="scalpel_transaction_commit",
+                    stage="transaction_commit",
                     reason=f"step {idx} ({tool_name!r}) returned invalid JSON: {exc!r}",
                 ))
                 break
@@ -4643,56 +4643,61 @@ _bind_facade_dispatch_table()
 
 
 __all__ = [
-    "ScalpelAnnotateReturnTypeTool",
-    "ScalpelAutoImportSpecializedTool",
-    "ScalpelChangeReturnTypeTool",
-    "ScalpelChangeTypeShapeTool",
-    "ScalpelChangeVisibilityTool",
-    "ScalpelCompleteMatchArmsTool",
-    "ScalpelConvertFromRelativeImportsTool",
-    "ScalpelConvertModuleLayoutTool",
-    "ScalpelConvertToAsyncTool",
-    "ScalpelConvertToMethodObjectTool",
-    "ScalpelExpandGlobImportsTool",
-    "ScalpelExpandMacroTool",
-    "ScalpelExtractLifetimeTool",
-    "ScalpelExtractSectionTool",
-    "ScalpelExtractTool",
-    "ScalpelFixLintsTool",
-    "ScalpelGenerateConstructorTool",
-    "ScalpelGenerateFromUndefinedTool",
-    "ScalpelGenerateMemberTool",
-    "ScalpelGenerateTraitImplScaffoldTool",
-    "ScalpelIgnoreDiagnosticTool",
-    "ScalpelImportsOrganizeTool",
-    "ScalpelInlineTool",
-    "ScalpelIntroduceParameterTool",
-    "ScalpelLocalToFieldTool",
-    "ScalpelOrganizeLinksTool",
-    "ScalpelOverrideMethodsTool",
-    "ScalpelRenameHeadingTool",
-    "ScalpelRenameTool",
-    "ScalpelSplitDocTool",
-    "ScalpelSplitFileTool",
-    "ScalpelTidyStructureTool",
-    "ScalpelTransactionCommitTool",
-    "ScalpelUseFunctionTool",
-    "ScalpelVerifyAfterRefactorTool",
+    "AnnotateReturnTypeTool",
+    "AutoImportSpecializedTool",
+    "ChangeReturnTypeTool",
+    "ChangeTypeShapeTool",
+    "ChangeVisibilityTool",
+    "CompleteMatchArmsTool",
+    "ConvertFromRelativeImportsTool",
+    "ConvertModuleLayoutTool",
+    "ConvertToAsyncTool",
+    "ConvertToMethodObjectTool",
+    "ExpandGlobImportsTool",
+    "ExpandMacroTool",
+    "ExtractLifetimeTool",
+    "ExtractSectionTool",
+    "ExtractTool",
+    "FixLintsTool",
+    "GenerateConstructorTool",
+    "GenerateFromUndefinedTool",
+    "GenerateMemberTool",
+    "GenerateTraitImplScaffoldTool",
+    "IgnoreDiagnosticTool",
+    "ImportsOrganizeTool",
+    "InlineTool",
+    "IntroduceParameterTool",
+    "LocalToFieldTool",
+    "OrganizeLinksTool",
+    "OverrideMethodsTool",
+    "RenameHeadingTool",
+    "RenameTool",
+    "SplitDocTool",
+    "SplitFileTool",
+    "TidyStructureTool",
+    "TransactionCommitTool",
+    "UseFunctionTool",
+    "VerifyAfterRefactorTool",
 ]
 
 
 # Apply-source capture — fixes D-debt.md §2 flakes. Function attaches
-# __wrapped_source__ to every Scalpel*Tool.apply so introspection is
+# __wrapped_source__ to every facade Tool.apply so introspection is
 # independent of linecache. Name-based discovery (DRY): new facades
 # auto-register. Callers read via facade_support.get_apply_source(cls).
+#
+# v2.0 wire-name cleanup (spec 2026-05-03 § 5.1): the ``Scalpel`` class
+# prefix was dropped, so the discovery filter is now: defined-in-this-
+# module + ``Tool`` suffix + concrete ``Tool`` subclass.
 def _attach_apply_source_to_all_facades() -> None:
     for _name, _obj in list(globals().items()):
-        if (
-            isinstance(_obj, type)
-            and _name.startswith("Scalpel")
-            and _name.endswith("Tool")
-        ):
-            attach_apply_source(_obj)
+        if not (isinstance(_obj, type) and _name.endswith("Tool")):
+            continue
+        if not issubclass(_obj, Tool) or _obj is Tool:
+            continue
+        if _obj.__module__ != __name__:
+            continue
+        attach_apply_source(_obj)
 
 
 _attach_apply_source_to_all_facades()
