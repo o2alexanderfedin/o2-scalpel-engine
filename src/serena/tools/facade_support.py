@@ -74,13 +74,34 @@ def _lsp_position_to_offset(lines: list[str], line: int, character: int) -> int:
 
 
 def _splice_text_edit(source: str, edit: dict[str, Any]) -> str:
-    """Replace ``source`` between LSP positions with ``edit['newText']``."""
+    """Replace ``source`` between LSP positions with ``edit['newText']``.
+
+    Idempotence guard (SQ2 / B4-BUG-01): before splicing, check whether the
+    text at the splice site already equals ``newText`` AND the range beyond
+    ``start_offset + len(newText)`` starts where ``end_offset`` pointed in the
+    original source.  When both hold the edit was already applied — return
+    ``source`` unchanged.
+
+    Concretely: if ``source[start_offset:start_offset + len(newText)]`` equals
+    ``newText`` **and** ``end_offset <= start_offset + len(newText)`` (i.e. the
+    original range is entirely subsumed by the already-written text), the splice
+    would produce no net change — skip it.  This covers both zero-width
+    insertions (``start == end``) and non-zero-width replacements whose result
+    has already been applied.
+    """
     start = edit["range"]["start"]
     end = edit["range"]["end"]
     new_text = edit["newText"]
     lines = source.splitlines(keepends=True)
     start_offset = _lsp_position_to_offset(lines, start["line"], start["character"])
     end_offset = _lsp_position_to_offset(lines, end["line"], end["character"])
+    # Idempotence guard: the edit was already applied when the content starting
+    # at start_offset already matches newText and the original range end is
+    # covered by the already-written span.  In that case re-splicing would
+    # insert a duplicate suffix of newText — skip instead.
+    n = len(new_text)
+    if new_text and source[start_offset:start_offset + n] == new_text and end_offset <= start_offset + n:
+        return source
     return source[:start_offset] + new_text + source[end_offset:]
 
 
@@ -97,7 +118,11 @@ def _apply_text_edits_to_file_uri(uri: str, edits: list[dict[str, Any]]) -> int:
         return 0
     if not target.exists():
         return 0
-    source = target.read_text(encoding="utf-8")
+    # Use newline="" to disable universal-newline translation so that \r,
+    # \r\n, and \n in the file are preserved exactly as stored.  LSP edits
+    # address raw codepoint offsets; silently coercing \r → \n would shift
+    # those offsets and cause idempotence violations on re-apply.
+    pre_text = target.read_text(encoding="utf-8", newline="")
     sorted_edits = sorted(
         edits,
         key=lambda e: (
@@ -105,9 +130,18 @@ def _apply_text_edits_to_file_uri(uri: str, edits: list[dict[str, Any]]) -> int:
         ),
         reverse=True,
     )
+    post_text = pre_text
     for edit in sorted_edits:
-        source = _splice_text_edit(source, edit)
-    target.write_text(source, encoding="utf-8")
+        post_text = _splice_text_edit(post_text, edit)
+    # Idempotence guard (SQ2 / B4-BUG-01): if applying the edits produces
+    # the same content that is already on disk, the edit was already applied
+    # (e.g. a retry or a re-apply of the same WorkspaceEdit).  Skip the
+    # write so the function is idempotent for all edit patterns, including
+    # zero-width insertions where start == end and the range does not
+    # consume any characters.
+    if post_text == pre_text:
+        return 0
+    target.write_text(post_text, encoding="utf-8", newline="")
     return len(sorted_edits)
 
 
